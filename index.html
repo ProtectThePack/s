@@ -2,52 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PTP Shortener</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mailto Link Generator — Protect The Pack</title>
 <style>
-body{font-family:system-ui;margin:40px auto;max-width:600px;line-height:1.5}
-input,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
-button{background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer}
-#out{margin-top:20px;word-break:break-all}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;max-width:860px;margin:32px auto;padding:0 16px;line-height:1.5}
+h1{margin:0 0 16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{font-weight:600;margin-top:12px;display:block}
+textarea,input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px}
+small{color:#666}
+.btns{margin:16px 0;display:flex;gap:12px;flex-wrap:wrap}
+button{padding:10px 14px;border:1px solid #111;border-radius:8px;background:#111;color:#fff;cursor:pointer}
+#output{word-break:break-all;background:#fafafa;border:1px dashed #ccc;padding:10px;border-radius:8px;margin-top:8px}
+.tip{background:#fff8e1;border-left:4px solid #f0b400;padding:8px 12px;border-radius:6px;margin:8px 0}
+code{background:#f5f5f5;padding:2px 6px;border-radius:4px}
 </style>
 </head>
 <body>
-<h1>Protect The Pack Shortener</h1>
+<h1>Mailto Link Generator</h1>
+<p>Build robust <code>mailto:</code> links for campaigns (subject/body/CC/BCC). Use <code>\n</code> for new lines. Emojis are fine.</p>
 
-<div id="creator">
-  <p>Paste your long link:</p>
-  <input id="longurl" placeholder="mailto:..." />
-  <p>Your GitHub token (stored only in your browser):</p>
-  <input id="token" type="password" placeholder="ghp_..." />
-  <button id="make">Shorten</button>
-  <div id="out"></div>
+<div class="row">
+  <div>
+    <label>To (comma-separated)</label>
+    <input id="to" placeholder="da@example.gov, animalservices@city.gov">
+  </div>
+  <div>
+    <label>CC (optional)</label>
+    <input id="cc" placeholder="publicinfo@city.gov">
+  </div>
 </div>
 
-<script>
-const owner = "YOUR_GITHUB_USERNAME";
-const repo = "s";
+<div class="row">
+  <div>
+    <label>BCC (optional)</label>
+    <input id="bcc" placeholder="media@news.com">
+  </div>
+  <div>
+    <label>Subject</label>
+    <input id="subject" placeholder="Request: Animal Welfare Check — 2400 Fort Worth Ave">
+  </div>
+</div>
 
-async function createRedirect(code, target, token){
-  const content = `<!doctype html><meta http-equiv="refresh" content="0;url=${target}"><script>location='${target}'</script>`;
-  const encoded = btoa(unescape(encodeURIComponent(content)));
-  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${code}.html`, {
-    method: "PUT",
-    headers: { Authorization: "token " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "Add shortlink " + code, content: encoded })
+<label>Body</label>
+<textarea id="body" rows="10" placeholder="Dear [TITLE] [LASTNAME],\n\nI am requesting an immediate welfare check at [ADDRESS]...\n\nSincerely,\n[YOUR NAME]\n[POSTCODE]"></textarea>
+
+</div>
+
+<div class="btns">
+  <button id="build">Build mailto</button>
+  <button id="test">Open in your client (test)</button>
+  <button id="copy">Copy link</button>
+</div>
+
+<label>Result</label>
+<div id="output"></div>
+
+<script>
+function enc(v){return encodeURIComponent(v).replace(/%20/g,'+');}
+function buildLink(){
+  const to=document.getElementById('to').value.trim();
+  const cc=document.getElementById('cc').value.trim();
+  const bcc=document.getElementById('bcc').value.trim();
+  const subject=document.getElementById('subject').value;
+  let body=document.getElementById('body').value;
+  if(document.getElementById('includeSignature').checked){
+    body+=(body.endsWith('\\n')?'':'\\n')+'\\n--\\n[Your Name]\\n[Postcode]';
+  }
+  const params=[];
+  if(subject)params.push('subject='+enc(subject));
+  if(body)params.push('body='+enc(body));
+  if(cc)params.push('cc='+enc(cc));
+  if(bcc)params.push('bcc='+enc(bcc));
+  const q=params.length?'?'+params.join('&'):'';
+  return 'mailto:'+to+q;
+}
+document.getElementById('build').onclick=()=>{document.getElementById('output').textContent=buildLink();};
+document.getElementById('copy').onclick=async()=>{
+  const link=buildLink();
+  try{await navigator.clipboard.writeText(link);alert('Copied!');}catch(e){alert('Copy failed');}
+};
+document.getElementById('test').onclick=()=>{window.location.href=buildLink();};
+</script>
+
+<hr>
+<h2>Shorten your link</h2>
+<p>Paste the full mailto (or any long URL) below with your personal GitHub token.  
+This will automatically create a short redirect file in your GitHub Pages repo (<strong>protectthepack/s</strong>).</p>
+<input id="shortlink-input" placeholder="mailto:..." style="width:100%;padding:8px">
+<input id="token" type="password" placeholder="GitHub personal access token (repo scope)" style="width:100%;padding:8px;margin-top:6px">
+<button id="shorten-btn" style="padding:10px 14px;margin-top:8px;">Create Short Link</button>
+<div id="shorten-out" style="margin-top:10px;word-break:break-all"></div>
+
+<script>
+/* === SHORTENER SECTION === */
+const ghOwner="protectthepack";  // your username
+const ghRepo="s";                // your repo
+
+async function createRedirectFile(code,target,token){
+  const html=`<!doctype html><meta http-equiv="refresh" content="0;url=${target}"><script>location='${target}'</script>`;
+  const b64=btoa(unescape(encodeURIComponent(html)));
+  const res=await fetch(`https://api.github.com/repos/s{ghOwner}/${ghRepo}/contents/${code}.html`,{
+    method:"PUT",
+    headers:{Authorization:"token "+token,"Content-Type":"application/json"},
+    body:JSON.stringify({message:"Add shortlink "+code,content:b64})
   });
-  if (!res.ok) throw new Error("GitHub API error: " + res.status);
+  if(!res.ok)throw new Error("GitHub API error: "+res.status);
 }
 
-document.getElementById("make").onclick = async ()=>{
-  const url = document.getElementById("longurl").value.trim();
-  const token = document.getElementById("token").value.trim();
-  if(!url || !token) return alert("Paste both fields.");
-  const code = Math.random().toString(36).slice(2,6);
+document.getElementById("shorten-btn").onclick=async()=>{
+  const longurl=document.getElementById("shortlink-input").value.trim();
+  const token=document.getElementById("token").value.trim();
+  if(!longurl||!token)return alert("Paste both link and token first.");
+  const code=Math.random().toString(36).slice(2,6);
   try{
-    await createRedirect(code, encodeURI(url), token);
-    const short = `https://${owner}.github.io/${repo}/${code}.html`;
-    document.getElementById("out").innerHTML = `<p><strong>Short link:</strong> <a href="${short}" target="_blank">${short}</a></p>`;
-  }catch(e){ alert(e.message); }
+    await createRedirectFile(code,encodeURI(longurl),token);
+    const short=`https://${ghOwner}.github.io/${ghRepo}/${code}.html`;
+    document.getElementById("shorten-out").innerHTML=`<p><strong>Short link created:</strong> <a href="${short}" target="_blank">${short}</a></p>`;
+  }catch(e){
+    document.getElementById("shorten-out").textContent=e.message;
+  }
 };
 </script>
 </body>
