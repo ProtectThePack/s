@@ -95,32 +95,49 @@ This will automatically create a short redirect file in your GitHub Pages repo (
 <div id="shorten-out" style="margin-top:10px;word-break:break-all"></div>
 
 <script>
-/* === SHORTENER SECTION === */
-const ghOwner="protectthepack";  // your username
-const ghRepo="s";                // your repo
+const ghOwner = "protectthepack";
+const ghRepo  = "s";
 
-async function createRedirectFile(code,target,token){
-  const html=`<!doctype html><meta http-equiv="refresh" content="0;url=${target}"><script>location='${target}'</script>`;
-  const b64=btoa(unescape(encodeURIComponent(html)));
-  const res=await fetch(`https://api.github.com/repos/s{ghOwner}/${ghRepo}/contents/${code}.html`,{
-    method:"PUT",
-    headers:{Authorization:"token "+token,"Content-Type":"application/json"},
-    body:JSON.stringify({message:"Add shortlink "+code,content:b64})
+async function createRedirectFile(code, target, token) {
+  // Escape any single quotes in the URL for the inline JS
+  const safeTarget = String(target).replace(/'/g, "\\'");
+  // IMPORTANT: break the closing tag so the outer <script> isn’t terminated
+  const html =
+    '<!doctype html>' +
+    '<meta http-equiv="refresh" content="0;url=' + target + '">' +
+    '<script>location=\'' + safeTarget + '\'</scr' + 'ipt>';
+
+  // Unicode-safe base64
+  const b64 = btoa(unescape(encodeURIComponent(html)));
+
+  const res = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${code}.html`, {
+    method: "PUT",
+    headers: {
+      Authorization: "token " + token,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: "Add shortlink " + code,
+      content: b64
+    })
   });
-  if(!res.ok)throw new Error("GitHub API error: "+res.status);
+  if (!res.ok) throw new Error("GitHub API error: " + res.status);
 }
 
-document.getElementById("shorten-btn").onclick=async()=>{
-  const longurl=document.getElementById("shortlink-input").value.trim();
-  const token=document.getElementById("token").value.trim();
-  if(!longurl||!token)return alert("Paste both link and token first.");
-  const code=Math.random().toString(36).slice(2,6);
-  try{
-    await createRedirectFile(code,encodeURI(longurl),token);
-    const short=`https://${ghOwner}.github.io/${ghRepo}/${code}.html`;
-    document.getElementById("shorten-out").innerHTML=`<p><strong>Short link created:</strong> <a href="${short}" target="_blank">${short}</a></p>`;
-  }catch(e){
-    document.getElementById("shorten-out").textContent=e.message;
+document.getElementById("shorten-btn").onclick = async () => {
+  const longurl = document.getElementById("shortlink-input").value.trim();
+  const token   = document.getElementById("token").value.trim();
+  if (!longurl || !token) return alert("Paste both link and token first.");
+
+  const code = Math.random().toString(36).slice(2, 6);
+  try {
+    // Don’t double-encode: assume your mailto is already encoded.
+    await createRedirectFile(code, longurl, token);
+    const short = `https://${ghOwner}.github.io/${ghRepo}/${code}.html`;
+    document.getElementById("shorten-out").innerHTML =
+      `<p><strong>Short link created:</strong> <a href="${short}" target="_blank" rel="noopener">${short}</a></p>`;
+  } catch (e) {
+    document.getElementById("shorten-out").textContent = e.message;
   }
 };
 </script>
