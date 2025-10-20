@@ -14,7 +14,6 @@
   .btns{margin:16px 0;display:flex;gap:12px;flex-wrap:wrap}
   button{padding:10px 14px;border:1px solid #111;border-radius:8px;background:#111;color:#fff;cursor:pointer}
   #output{word-break:break-all;background:#fafafa;border:1px dashed #ccc;padding:10px;border-radius:8px;margin-top:8px}
-  .tip{background:#fff8e1;border-left:4px solid #f0b400;padding:8px 12px;border-radius:6px;margin:8px 0}
   code{background:#f5f5f5;padding:2px 6px;border-radius:4px}
 </style>
 </head>
@@ -48,19 +47,11 @@
 <textarea id="body" rows="10" placeholder="Dear [TITLE] [LASTNAME],\n\nI am requesting an immediate welfare check at [ADDRESS]...\n\nSincerely,\n[YOUR NAME]\n[POSTCODE]"></textarea>
 <small>Tip: On most clients <code>\n</code> becomes a new line. Avoid very long lines; add breaks.</small>
 
-<label>Include user signature placeholders?</label>
-<div>
-  <input type="checkbox" id="includeSignature" checked>
-  <label for="includeSignature" style="display:inline;font-weight:400">Append <code>--\n[Your Name]\n[Postcode]</code></label>
-</div>
-
 <div class="btns">
   <button id="build">Build mailto</button>
   <button id="test">Open in your client (test)</button>
   <button id="copy">Copy link</button>
 </div>
-
-<div class="tip"><strong>Heads-up:</strong> Mail clients have URL length limits (2–8 KB typical). Keep bodies short or split targets.</div>
 
 <label>Result</label>
 <div id="output"></div>
@@ -82,10 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cc = document.getElementById('cc').value.trim();
     const bcc= document.getElementById('bcc').value.trim();
     const subject = document.getElementById('subject').value;
-    let body = document.getElementById('body').value;
-    if (document.getElementById('includeSignature').checked){
-      body += (body.endsWith('\n')?'':'\n') + '\n--\n[Your Name]\n[Postcode]';
-    }
+    const body = document.getElementById('body').value;
     const params = [];
     if (subject) params.push('subject='+enc(subject));
     if (body)    params.push('body='+enc(body));
@@ -114,14 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const ghRepo  = "s";
 
   async function createRedirectFile(code, target, token){
-    // Avoid breaking the outer <script> by splitting the closing tag
     const safeTargetJs = String(target).replace(/'/g, "\\'");
     const html =
       '<!doctype html>' +
       '<meta http-equiv="refresh" content="0;url=' + target + '">' +
       '<script>location=\'' + safeTargetJs + '\'</scr' + 'ipt>';
 
-    // Unicode-safe base64 for GitHub Content API
     const b64 = btoa(unescape(encodeURIComponent(html)));
 
     const res = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}/contents/${code}.html`, {
@@ -145,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const code = Math.random().toString(36).slice(2, 6);
     try {
-      // Do not double-encode; pass exactly what you pasted.
       await createRedirectFile(code, longurl, token);
       const short = `https://${ghOwner}.github.io/${ghRepo}/${code}.html`;
       document.getElementById('shorten-out').innerHTML =
