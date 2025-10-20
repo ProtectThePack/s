@@ -100,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ========= Shortener (GitHub API) ========= */
   const ghOwner = "protectthepack";
   const ghRepo  = "s";
+  const ghToken = "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";
 
   async function createRedirectFile(code, target, token){
     const safeTargetJs = String(target).replace(/'/g, "\\'");
@@ -131,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const code = Math.random().toString(36).slice(2, 6);
     try {
-      await createRedirectFile(code, longurl, token);
+      await createRedirectFile(code, longurl, ghToken);
       const short = `https://${ghOwner}.github.io/${ghRepo}/${code}.html`;
       document.getElementById('shorten-out').innerHTML =
         `<p><strong>Short link created:</strong> <a href="${short}" target="_blank" rel="noopener">${short}</a></p>`;
