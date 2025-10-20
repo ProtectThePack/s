@@ -2,47 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PTP Shortlink</title>
+<title>PTP Shortener</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 body{font-family:system-ui;margin:40px auto;max-width:600px;line-height:1.5}
-input,textarea,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
+input,button{width:100%;padding:10px;margin-top:8px;font-size:16px}
 button{background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer}
 #out{margin-top:20px;word-break:break-all}
-small{color:#666}
 </style>
 </head>
 <body>
-<h1>Protect The Pack Shortlink Generator</h1>
-<p>Paste your long URL (mailto or normal). You’ll get a short one under your GitHub Pages address.</p>
+<h1>Protect The Pack Shortener</h1>
 
-<textarea id="longurl" rows="3" placeholder="mailto:john.creuzot@dallascounty.org?subject=..."></textarea>
-<button id="make">Generate Shortlink</button>
-
-<div id="out"></div>
-
-<hr>
-<small>Local only: mappings save in your browser storage. Hardcode permanent ones in the JS if you need persistence.</small>
+<div id="creator">
+  <p>Paste your long link:</p>
+  <input id="longurl" placeholder="mailto:..." />
+  <p>Your GitHub token (stored only in your browser):</p>
+  <input id="token" type="password" placeholder="ghp_..." />
+  <button id="make">Shorten</button>
+  <div id="out"></div>
+</div>
 
 <script>
-const base = location.origin + location.pathname;
-const map = JSON.parse(localStorage.getItem("shortlinks")||"{}");
-const p = new URLSearchParams(location.search);
-const key = p.get("go");
+const owner = "YOUR_GITHUB_USERNAME";
+const repo = "s";
 
-// redirect mode
-if(key && map[key]){ location.replace(map[key]); }
+async function createRedirect(code, target, token){
+  const content = `<!doctype html><meta http-equiv="refresh" content="0;url=${target}"><script>location='${target}'</script>`;
+  const encoded = btoa(unescape(encodeURIComponent(content)));
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${code}.html`, {
+    method: "PUT",
+    headers: { Authorization: "token " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "Add shortlink " + code, content: encoded })
+  });
+  if (!res.ok) throw new Error("GitHub API error: " + res.status);
+}
 
-// generator mode
-document.getElementById("make").onclick = ()=>{
-  const longurl = document.getElementById("longurl").value.trim();
-  if(!longurl){alert("Paste something first");return;}
+document.getElementById("make").onclick = async ()=>{
+  const url = document.getElementById("longurl").value.trim();
+  const token = document.getElementById("token").value.trim();
+  if(!url || !token) return alert("Paste both fields.");
   const code = Math.random().toString(36).slice(2,6);
-  map[code] = longurl;
-  localStorage.setItem("shortlinks", JSON.stringify(map));
-  const short = base.split("?")[0] + "?go=" + code;
-  document.getElementById("out").innerHTML =
-    `<p><strong>Short link:</strong> <a href="${short}" target="_blank">${short}</a></p>`;
+  try{
+    await createRedirect(code, encodeURI(url), token);
+    const short = `https://${owner}.github.io/${repo}/${code}.html`;
+    document.getElementById("out").innerHTML = `<p><strong>Short link:</strong> <a href="${short}" target="_blank">${short}</a></p>`;
+  }catch(e){ alert(e.message); }
 };
 </script>
 </body>
